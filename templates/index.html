@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoalMetrics - Football Data Analyst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .container {
+            max-width: 95%;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .select-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            align-items: flex-end;
+        }
+        .data-table-container {
+            overflow-x: auto;
+            max-height: 70vh;
+            margin-top: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+        .data-table th, .data-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            color: #334155;
+        }
+        .data-table tr:hover {
+            background-color: #f8fafc;
+        }
+        .search-group {
+            display: flex;
+            flex-grow: 1;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .loading-overlay.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #000;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 1rem;
+            gap: 0.5rem;
+        }
+        .stats-container {
+            background-color: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .stat-card {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .project-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .project-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .project-card.selected {
+            border-left: 4px solid #3b82f6;
+            background-color: #f0f7ff;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #10b981;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: #e2e8f0;
+        }
+        .tab-button.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 1rem auto;
+        }
+        .video-container video, .video-container canvas {
+            width: 100%;
+            display: block;
+        }
+        .video-container canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        .record-details {
+            background-color: #f1f5f9;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .record-details span {
+            font-weight: 600;
+            color: #334155;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="container">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">
+                <i class="fas fa-futbol mr-2 text-green-600"></i>GoalMetrics Football Data Analyst
+            </h1>
+            <div class="flex gap-2">
+                <div class="tab-button active" data-tab="projects-view">
+                    <i class="fas fa-list"></i> Projects
+                </div>
+                <div class="tab-button" data-tab="data-view">
+                    <i class="fas fa-table"></i> Data View
+                </div>
+                <div class="tab-button" data-tab="stats-view">
+                    <i class="fas fa-chart-bar"></i> Statistics
+                </div>
+            </div>
+        </div>
+        
+        <!-- Projects View -->
+        <div class="projects-view" id="projects-view">
+            <h2 class="text-xl font-semibold mb-4">Available Projects</h2>
+            <div id="projects-container">
+                {% for project in projects %}
+                <div class="project-card" data-project-id="{{ project.id }}">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-semibold">{{ project.display_name }}</h3>
+                        <span class="text-sm px-2 py-1 rounded-full 
+                            {% if project.status == 'completed' %}bg-green-100 text-green-800
+                            {% elif project.status == 'processing' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ project.status }}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">Video: {{ project.video_path }}</p>
+                    <p class="text-sm text-gray-600">Database: {{ project.db_path }}</p>
+                    <div class="mt-3">
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span>Progress: {{ project.progress }}%</span>
+                            <span>{{ project.processed_frames }}/{{ project.total_frames }} frames</span>
+                        </div>
+                        <div class="progress-bar mt-1">
+                            <div class="progress-fill" style="width: {{ project.progress }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Data View -->
+        <div class="data-view hidden" id="data-view">
+            <div class="select-container">
+                <div class="flex-1">
+                    <label for="table-select" class="block text-gray-700 font-medium mb-1">Select Table:</label>
+                    <select id="table-select" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" disabled>
+                        <option value="" disabled selected>-- Select a table --</option>
+                    </select>
+                </div>
+
+                <div class="flex-1 search-group">
+                    <div class="flex-1">
+                        <label for="search-column-select" class="block text-gray-700 font-medium mb-1">Search Column:</label>
+                        <select id="search-column-select" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" disabled>
+                            <option value="" selected>-- Select a column --</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="search-operator" class="block text-gray-700 font-medium mb-1">Operator:</label>
+                        <select id="search-operator" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                            <option value="" selected="">-- Select a operator --</option>
+                            <option value="=">= (Equals)</option>
+                            <option value="!=">!= (Not Equals)</option>
+                            <option value=">">> (Greater Than)</option>
+                            <option value="<">< (Less Than)</option>
+                            <option value=">=">>= (Greater or Equal)</option>
+                            <option value="<="><= (Less or Equal)</option>
+                            <option value="LIKE">LIKE (Contains)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="search-input" class="block text-gray-700 font-medium mb-1">Search Value:</label>
+                        <input type="text" id="search-input" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="Enter search value..." disabled>
+                    </div>
+                    <button id="search-button" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200" disabled>
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-4">
+                <div class="flex items-center gap-4">
+                    <div>
+                        <label for="sort-select" class="block text-gray-700 font-medium mb-1">Sort By:</label>
+                        <select id="sort-select" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" disabled>
+                            <option value="" selected>-- No sorting --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sort-order" class="block text-gray-700 font-medium mb-1">Order:</label>
+                        <select id="sort-order" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" disabled>
+                            <option value="ASC">Ascending</option>
+                            <option value="DESC">Descending</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="limit-select" class="block text-gray-700 font-medium mb-1">Rows per page:</label>
+                        <select id="limit-select" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="250">250</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="record-count" class="text-gray-600 font-medium"></div>
+            </div>
+            
+            <!-- Video and Bounding Box Section -->
+            <div id="video-box-container" class="mt-4 hidden">
+                <h3 class="text-lg font-semibold mb-2">Selected Record Details</h3>
+                <div class="video-container">
+                    <video id="player-video" controls></video>
+                    <canvas id="bounding-box-canvas"></canvas>
+                </div>
+                <div id="record-details" class="record-details hidden"></div>
+            </div>
+
+            <div class="data-table-container" id="data-container">
+                <!-- Data will be displayed here -->
+            </div>
+
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Stats View -->
+        <div class="stats-view hidden" id="stats-view">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="flex-1">
+                    <label for="stats-column-select" class="block text-gray-700 font-medium mb-1">Select Column for Statistics:</label>
+                    <select id="stats-column-select" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" disabled>
+                        <option value="" disabled selected>-- Select a column --</option>
+                    </select>
+                </div>
+                <button id="generate-stats" class="px-6 py-2 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200 mt-4" disabled>
+                    <i class="fas fa-chart-bar"></i> Generate Stats
+                </button>
+            </div>
+            <div class="stats-container" id="stats-results">
+                <!-- Statistics will be displayed here -->
+            </div>
+        </div>
+
+        <!-- Project Info Panel -->
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg hidden" id="project-info-panel">
+            <h3 class="text-lg font-semibold mb-2">Project Details</h3>
+            <div id="project-details"></div>
+        </div>
+    </div>
+
+    <script>
+        const tableSelect = document.getElementById('table-select');
+        const searchColumnSelect = document.getElementById('search-column-select');
+        const searchOperator = document.getElementById('search-operator');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const sortSelect = document.getElementById('sort-select');
+        const sortOrder = document.getElementById('sort-order');
+        const limitSelect = document.getElementById('limit-select');
+        const dataContainer = document.getElementById('data-container');
+        const paginationContainer = document.getElementById('pagination');
+        const recordCount = document.getElementById('record-count');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const statsColumnSelect = document.getElementById('stats-column-select');
+        const generateStatsButton = document.getElementById('generate-stats');
+        const statsResults = document.getElementById('stats-results');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const projectsView = document.getElementById('projects-view');
+        const dataView = document.getElementById('data-view');
+        const statsView = document.getElementById('stats-view');
+        const projectCards = document.querySelectorAll('.project-card');
+        const projectInfoPanel = document.getElementById('project-info-panel');
+        const projectDetails = document.getElementById('project-details');
+        const videoBoxContainer = document.getElementById('video-box-container');
+        const playerVideo = document.getElementById('player-video');
+        const bbCanvas = document.getElementById('bounding-box-canvas');
+        const bbCtx = bbCanvas.getContext('2d');
+        const recordDetailsPanel = document.getElementById('record-details');
+
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentProject = null;
+        let currentTable = '';
+        let currentColumns = [];
+        let currentVideoPath = '';
+        const FPS = 30; // Assuming 30 frames per second.
+
+        // Tab switching
+        tabButtons.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+                tabButtons.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                if (tabName === 'projects-view') {
+                    projectsView.classList.remove('hidden');
+                    dataView.classList.add('hidden');
+                    statsView.classList.add('hidden');
+                } else if (tabName === 'data-view') {
+                    projectsView.classList.add('hidden');
+                    dataView.classList.remove('hidden');
+                    statsView.classList.add('hidden');
+                } else {
+                    projectsView.classList.add('hidden');
+                    dataView.classList.add('hidden');
+                    statsView.classList.remove('hidden');
+                }
+            });
+        });
+
+        // Project selection
+        projectCards.forEach(card => {
+            card.addEventListener('click', () => {
+                projectCards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                currentProject = card.getAttribute('data-project-id');
+                
+                // Reset video and canvas
+                resetVideo();
+
+                // Load project details
+                fetchPost('/get_project_info', { project_id: currentProject })
+                    .then(projectInfo => {
+                        if (projectInfo) {
+                            let detailsHtml = `
+                                <p><strong>Status:</strong> ${projectInfo.status}</p>
+                                <p><strong>Progress:</strong> ${projectInfo.progress}%</p>
+                                <p><strong>Total Frames:</strong> ${projectInfo.total_frames}</p>
+                                <p><strong>Processed Frames:</strong> ${projectInfo.processed_frames}</p>
+                                <p><strong>Video Path:</strong> ${projectInfo.paths.vid_path}</p>
+                                <p><strong>Database Path:</strong> ${projectInfo.paths.db_path}</p>
+                            `;
+                            projectDetails.innerHTML = detailsHtml;
+                            projectInfoPanel.classList.remove('hidden');
+                            
+                            // Use the fixed video path provided by the user
+                            const videoFileName = projectInfo.paths.vid_path;
+                            currentVideoPath = 'http://65.109.145.175/goalmeterics/annontated_vids/' + videoFileName;
+                        }
+                    });
+                
+                // Load tables for this project
+                getTables();
+                
+                // Switch to data view
+                tabButtons[1].click();
+            });
+        });
+
+        function showLoading() {
+            loadingOverlay.classList.add('visible');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.remove('visible');
+        }
+
+        async function fetchPost(url, data) {
+            showLoading();
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || 'Unknown error occurred.');
+                }
+                return result;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                dataContainer.innerHTML = `<div class="p-4 text-center text-red-500">Error: ${error.message}</div>`;
+                return null;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function renderTable(data, columns, paginationInfo) {
+            if (data.length === 0) {
+                dataContainer.innerHTML = `<div class="p-4 text-center text-gray-500">No data to display.</div>`;
+                return;
+            }
+
+            const tableHtml = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th class="px-4 py-2">${col}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                            <tr class="cursor-pointer hover:bg-gray-100 transition-colors" onclick='showVideoAndBoundingBox(${JSON.stringify(row)})'>
+                                ${columns.map(col => `<td class="px-4 py-2">${row[col] !== null && row[col] !== undefined ? row[col] : 'N/A'}</td>`).join('')}
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            dataContainer.innerHTML = tableHtml;
+            
+            // Update record count
+            if (paginationInfo) {
+                const { total_records, current_page, total_pages } = paginationInfo;
+                recordCount.textContent = `Showing ${data.length} of ${total_records} records (Page ${current_page} of ${total_pages})`;
+                
+                // Render pagination
+                renderPagination(current_page, total_pages);
+            }
+        }
+
+        function renderPagination(currentPage, totalPages) {
+            let paginationHtml = '';
+            
+            if (currentPage > 1) {
+                paginationHtml += `<button class="px-3 py-1 bg-gray-200 rounded-md" onclick="changePage(${currentPage - 1})">&laquo; Previous</button>`;
+            }
+            
+            // Show page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    paginationHtml += `<button class="px-3 py-1 bg-blue-600 text-white rounded-md">${i}</button>`;
+                } else {
+                    paginationHtml += `<button class="px-3 py-1 bg-gray-200 rounded-md" onclick="changePage(${i})">${i}</button>`;
+                }
+            }
+            
+            if (currentPage < totalPages) {
+                paginationHtml += `<button class="px-3 py-1 bg-gray-200 rounded-md" onclick="changePage(${currentPage + 1})">Next &raquo;</button>`;
+            }
+            
+            paginationContainer.innerHTML = paginationHtml;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            fetchData();
+        }
+
+        function resetVideo() {
+            videoBoxContainer.classList.add('hidden');
+            playerVideo.src = '';
+            bbCtx.clearRect(0, 0, bbCanvas.width, bbCanvas.height);
+            recordDetailsPanel.classList.add('hidden');
+        }
+
+        function showVideoAndBoundingBox(rowData) {
+            if (!currentVideoPath) {
+                console.error('Video path not set. Please select a project first.');
+                return;
+            }
+
+            const frameId = rowData.frame_id;
+            let xyxy = rowData.xyxy;
+
+            // Handle cases where xyxy is a string representation of an array
+            if (typeof xyxy === 'string') {
+                try {
+                    xyxy = JSON.parse(xyxy.replace(/'/g, '"'));
+                } catch (e) {
+                    console.error('Failed to parse xyxy string:', e);
+                    return;
+                }
+            }
+            
+            const videoTime = frameId / FPS;
+
+            // Show video container
+            videoBoxContainer.classList.remove('hidden');
+
+            // Set video source and time
+            playerVideo.src = currentVideoPath;
+            playerVideo.onloadeddata = () => {
+                playerVideo.currentTime = videoTime;
+                
+                // Set canvas size to match video
+                bbCanvas.width = playerVideo.videoWidth;
+                bbCanvas.height = playerVideo.videoHeight;
+
+                // Draw bounding box
+                drawBoundingBox(xyxy);
+            };
+
+            // Display record details
+            let detailsHtml = '';
+            for (const key in rowData) {
+                if (key !== 'xyxy') { // Exclude xyxy from the details panel
+                    let value = rowData[key];
+                    if (value !== null && value !== undefined) {
+                        detailsHtml += `<p><span>${key.replace('_', ' ')}:</span> ${value}</p>`;
+                    }
+                }
+            }
+            recordDetailsPanel.innerHTML = detailsHtml;
+            recordDetailsPanel.classList.remove('hidden');
+        }
+
+        function drawBoundingBox(xyxy) {
+            // Clear previous drawings
+            bbCtx.clearRect(0, 0, bbCanvas.width, bbCanvas.height);
+
+            // Set drawing style
+            bbCtx.strokeStyle = '#FF0000'; // Red color
+            bbCtx.lineWidth = 4;
+            bbCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            bbCtx.shadowBlur = 10;
+            bbCtx.shadowOffsetX = 2;
+            bbCtx.shadowOffsetY = 2;
+
+            // Draw the rectangle
+            const [x1, y1, x2, y2] = xyxy;
+            const normalizedWidth = x2 - x1;
+            const normalizedHeight = y2 - y1;
+            bbCtx.strokeRect(x1, y1, normalizedWidth, normalizedHeight);
+        }
+
+        async function getTables() {
+            if (!currentProject) {
+                tableSelect.disabled = true;
+                return;
+            }
+            
+            tableSelect.disabled = false;
+            tableSelect.innerHTML = `<option value="" disabled selected>-- Fetching tables... --</option>`;
+            
+            const tables = await fetchPost('/get_tables', { project_id: currentProject });
+            if (tables) {
+                tableSelect.innerHTML = `<option value="" disabled selected>-- Select a table --</option>`;
+                tables.forEach(table => {
+                    const option = document.createElement('option');
+                    option.value = table;
+                    option.textContent = table;
+                    tableSelect.appendChild(option);
+                });
+                
+                // Reset other controls
+                searchColumnSelect.innerHTML = `<option value="" selected>-- Select a column --</option>`;
+                statsColumnSelect.innerHTML = `<option value="" disabled selected>-- Select a column --</option>`;
+                sortSelect.innerHTML = `<option value="" selected>-- No sorting --</option>`;
+                searchInput.disabled = true;
+                searchButton.disabled = true;
+                sortSelect.disabled = true;
+                sortOrder.disabled = true;
+                generateStatsButton.disabled = true;
+                dataContainer.innerHTML = `<div class="p-4 text-center text-gray-500">Select a table to view data.</div>`;
+                recordCount.textContent = '';
+                paginationContainer.innerHTML = '';
+                statsResults.innerHTML = '';
+                resetVideo();
+            }
+        }
+
+        async function getColumns() {
+            const tableName = tableSelect.value;
+            if (!tableName) {
+                searchColumnSelect.disabled = true;
+                searchInput.disabled = true;
+                searchButton.disabled = true;
+                sortSelect.disabled = true;
+                sortOrder.disabled = true;
+                statsColumnSelect.disabled = true;
+                generateStatsButton.disabled = true;
+                return;
+            }
+            
+            currentTable = tableName;
+            searchColumnSelect.disabled = false;
+            searchInput.disabled = false;
+            searchButton.disabled = false;
+            sortSelect.disabled = false;
+            sortOrder.disabled = false;
+            statsColumnSelect.disabled = false;
+            generateStatsButton.disabled = false;
+
+            const columns = await fetchPost('/get_columns', { 
+                project_id: currentProject, 
+                table_name: tableName 
+            });
+            
+            if (columns) {
+                currentColumns = columns;
+                
+                // Populate search column select
+                searchColumnSelect.innerHTML = `<option value="" disabled selected>-- Select a column --</option>`;
+                columns.forEach(col => {
+                    const option = document.createElement('option');
+                    option.value = col;
+                    option.textContent = col;
+                    searchColumnSelect.appendChild(option);
+                });
+                
+                // Populate sort select
+                sortSelect.innerHTML = `<option value="" selected>-- No sorting --</option>`;
+                columns.forEach(col => {
+                    const option = document.createElement('option');
+                    option.value = col;
+                    option.textContent = col;
+                    sortSelect.appendChild(option);
+                });
+                
+                // Populate stats column select
+                statsColumnSelect.innerHTML = `<option value="" disabled selected>-- Select a column --</option>`;
+                columns.forEach(col => {
+                    const option = document.createElement('option');
+                    option.value = col;
+                    option.textContent = col;
+                    statsColumnSelect.appendChild(option);
+                });
+                
+                // Fetch initial data
+                currentPage = 1;
+                fetchData();
+            }
+        }
+
+        async function fetchData() {
+            const tableName = tableSelect.value;
+            const searchColumn = searchColumnSelect.value;
+            const searchText = searchInput.value;
+            const searchOp = searchOperator.value;
+            const sortCol = sortSelect.value;
+            const sortDir = sortOrder.value;
+            const limit = limitSelect.value;
+            const offset = (currentPage - 1) * limit;
+
+            const dataResponse = await fetchPost('/get_data', {
+                project_id: currentProject,
+                table_name: tableName,
+                search_column: searchColumn,
+                search_text: searchText,
+                search_operator: searchOp,
+                sort_by: sortCol,
+                sort_order: sortDir,
+                limit: parseInt(limit),
+                offset: offset
+            });
+            
+            if (dataResponse) {
+                renderTable(dataResponse.data, dataResponse.columns, {
+                    total_records: dataResponse.total_records,
+                    current_page: dataResponse.current_page,
+                    total_pages: dataResponse.total_pages
+                });
+            }
+        }
+
+        async function generateStats() {
+            const tableName = tableSelect.value;
+            const columnName = statsColumnSelect.value;
+            
+            if (!columnName) {
+                statsResults.innerHTML = `<div class="p-4 text-center text-red-500">Please select a column first.</div>`;
+                return;
+            }
+            
+            const statsResponse = await fetchPost('/get_stats', {
+                project_id: currentProject,
+                table_name: tableName,
+                stat_column: columnName
+            });
+            
+            if (statsResponse) {
+                let statsHtml = '';
+                
+                if (statsResponse.value_counts) {
+                    statsHtml += `<h3 class="text-xl font-semibold mb-4">Value Distribution for ${columnName}</h3>`;
+                    statsHtml += `<div class="stats-grid">`;
+                    
+                    // Show top 10 values by count
+                    const entries = Object.entries(statsResponse.value_counts);
+                    const topEntries = entries.sort((a, b) => b[1] - a[1]).slice(0, 10);
+                    
+                    topEntries.forEach(([value, count]) => {
+                        statsHtml += `
+                            <div class="stat-card">
+                                <div class="text-sm text-gray-500">${value}</div>
+                                <div class="text-2xl font-bold">${count}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    statsHtml += `</div>`;
+                }
+                
+                if (statsResponse.min !== undefined) {
+                    statsHtml += `<h3 class="text-xl font-semibold mt-6 mb-4">Numeric Statistics for ${columnName}</h3>`;
+                    statsHtml += `<div class="stats-grid">`;
+                    statsHtml += `
+                        <div class="stat-card">
+                            <div class="text-sm text-gray-500">Minimum</div>
+                            <div class="text-2xl font-bold">${statsResponse.min}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="text-sm text-gray-500">Maximum</div>
+                            <div class="text-2xl font-bold">${statsResponse.max}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="text-sm text-gray-500">Average</div>
+                            <div class="text-2xl font-bold">${statsResponse.avg.toFixed(2)}</div>
+                        </div>
+                    `;
+                    statsHtml += `</div>`;
+                }
+                
+                if (statsHtml === '') {
+                    statsHtml = `<div class="p-4 text-center text-gray-500">No statistics available for this column.</div>`;
+                }
+                
+                statsResults.innerHTML = statsHtml;
+            }
+        }
+
+        // Event listeners
+        tableSelect.addEventListener('change', getColumns);
+        searchButton.addEventListener('click', () => {
+            currentPage = 1;
+            fetchData();
+        });
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                currentPage = 1;
+                fetchData();
+            }
+        });
+        sortSelect.addEventListener('change', () => {
+            currentPage = 1;
+            fetchData();
+        });
+        sortOrder.addEventListener('change', () => {
+            currentPage = 1;
+            fetchData();
+        });
+        limitSelect.addEventListener('change', () => {
+            currentPage = 1;
+            fetchData();
+        });
+        generateStatsButton.addEventListener('click', generateStats);
+
+        // Make functions available globally for onclick events in HTML
+        window.changePage = changePage;
+        window.showVideoAndBoundingBox = showVideoAndBoundingBox;
+    </script>
+
+</body>
+</html>
