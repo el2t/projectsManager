@@ -432,12 +432,14 @@
                                 <p><strong>Processed Frames:</strong> ${projectInfo.processed_frames}</p>
                                 <p><strong>Video Path:</strong> ${projectInfo.paths.vid_path}</p>
                                 <p><strong>Database Path:</strong> ${projectInfo.paths.db_path}</p>
+                                <p><strong>annontated video:</strong> ${projectInfo.paths.annontated_video}</p>
                             `;
                             projectDetails.innerHTML = detailsHtml;
                             projectInfoPanel.classList.remove('hidden');
                             
                             // Use the fixed video path provided by the user
-                            const videoFileName = projectInfo.paths.vid_path;
+                            // const videoFileName = projectInfo.paths.vid_path;
+                            const videoFileName = projectInfo.paths.annontated_video;
                             currentVideoPath = 'http://65.109.145.175/goalmeterics/annontated_vids/' + videoFileName;
                         }
                     });
