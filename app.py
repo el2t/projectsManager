@@ -10,8 +10,8 @@ app = Flask(__name__)
 
 # Define the paths for projects and databases
 # تحديد مسار مجلد المشاريع وقواعد البيانات
-PROJECTS_DIR = '../GoalMeterics_web_and_api/DetectionExtraction/projects/'
-DB_DIR = '../GoalMeterics_web_and_api/DetectionExtraction/databases/'
+PROJECTS_DIR = '../GoalMeterics_WEB_API_GPU_Worker/DetectionExtraction/projects/'
+DB_DIR = '../GoalMeterics_WEB_API_GPU_Worker/DetectionExtraction/databases/'
 
 # Ensure directories exist
 if not os.path.exists(PROJECTS_DIR):
